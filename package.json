@@ -1,0 +1,30 @@
+{
+  "name": "dgen-one",
+  "version": "0.0.1",
+  "description": "RST Documentation Generator for nodejs",
+  "main": "index.js",
+  "scripts": {
+    "test": "./node_modules/mocha/bin/mocha --recursive"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "mocha": "^8.1.3"
+  },
+  "keywords": [
+    "docugen",
+    "doc generator",
+    "documentation",
+    "comments",
+	"documentation generator"
+  ],
+  "author": "Octav Zlatior",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ozlatior/dgen-one.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ozlatior/dgen-one/issues"
+  },
+  "homepage": "https://github.com/ozlatior/dgen-one#readme"
+}

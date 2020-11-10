@@ -2,10 +2,10 @@
  * Custom assertion and messages class
  */
 
-const message = require("./message.js");
+const message = require("./message/message.js");
 const evaluator = require("./condition.js");
 
-const replaceTokens = require("./message.js").replaceTokens;
+const replaceTokens = require("./message/message.js").replaceTokens;
 
 const otherReplaceTokens = message.replaceTokens;
 

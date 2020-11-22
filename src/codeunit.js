@@ -21,10 +21,14 @@ const ContentBlock = CodeBlock.ContentBlock;
 
 class CodeUnit {
 
-	constructor (content, row, path) {
+	constructor (content, row, path, name, description) {
 		this.content = content;
 		this.contentBlock = new ContentBlock(content, row);
+		this.contentBlock.setParent(this);
 		this.path = path;
+		this.name = name;
+		this.exportedName = null;
+		this.description = description;
 		this.buildMeta();
 		this.link = {
 			prev: [],
@@ -132,6 +136,30 @@ class CodeUnit {
 		}
 	}
 
+	getBlocks () {
+		return this.contentBlock.getBlocks();
+	}
+
+	getBlocksByType (type) {
+		return this.contentBlock.getBlocksByType(type);
+	}
+
+	getBlocksByInstance (instance) {
+		return this.contentBlock.getBlocksByInstance(instance);
+	}
+
+	getFirstBlock () {
+		return this.contentBlock.getBlocks()[0];
+	}
+
+	getBlockAt (i) {
+		return this.contentBlock.getBlocks()[i];
+	}
+
+	getBlockIndex (block) {
+		return this.contentBlock.getBlocks().indexOf(block);
+	}
+
 	linkPrev (unit) {
 		if (this.link.prev.indexOf(unit) === -1)
 			this.link.prev.push(unit);
@@ -216,8 +244,20 @@ class CodeUnit {
 		return ret;
 	}
 
+	getName () {
+		return this.name;
+	}
+
+	getDescription () {
+		return this.description;
+	}
+
 	getPath () {
 		return this.path;
+	}
+
+	getContentBlock () {
+		return this.contentBlock;
 	}
 
 	getContentLength () {
@@ -230,6 +270,20 @@ class CodeUnit {
 
 	getExportedObjects () {
 		return this.exportedObjects.slice(0);
+	}
+
+	getExportedName () {
+		if (this.exportedName !== null)
+			return this.exportedName;
+		if (this.exportedMain !== null)
+			return this.exportedMain;
+		if (this.path !== null)
+			return this.path.split("/").pop().split(".").shift();
+		return null;
+	}
+
+	setExportedName (name) {
+		this.exportedName = name;
 	}
 
 	toString () {

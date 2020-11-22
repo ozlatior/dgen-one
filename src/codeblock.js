@@ -7,7 +7,7 @@
  * Blocks are linked like a list, but on three different levels:
  * - level 0: any block before or after, regardless of proximity
  * - level 1: any immediately adjacent block, regardless of type
- * - level 2: any block before or after, up to the first comment block that it's not level1-linked
+ * - level 2: any block before or after, up to the first comment block that is not level1-linked
  * 
  * For example:
  *
@@ -84,6 +84,8 @@ class CodeBlock {
 			this.startingRow = content.getStartingRow();
 			this.rowsBefore = content.getRowsBefore();
 			this.rowsAfter = content.getRowsAfter();
+			this.exportedName = content.getExportedName();
+			this._parent = content.getParent();
 		}
 		else {
 			if (content) {
@@ -95,6 +97,8 @@ class CodeBlock {
 			this.startingRow = row !== undefined ? row : 0;
 			this.rowsBefore = 0;
 			this.rowsAfter = 0;
+			this.exportedName = null;
+			this._parent = null;
 		}
 		// store previous and next blocks in this array, index is level
 		this.link = [
@@ -142,6 +146,22 @@ class CodeBlock {
 
 	setRowsAfter (rows) {
 		this.rowsAfter = rows;
+	}
+
+	getExportedName () {
+		return this.exportedName;
+	}
+
+	setExportedName (name) {
+		this.exportedName = name;
+	}
+
+	getParent () {
+		return this._parent;
+	}
+
+	setParent (_parent) {
+		this._parent = _parent;
 	}
 
 	setPrev (level, block) {
@@ -437,6 +457,219 @@ class CommentBlock extends CodeBlock {
 		return this.text.slice(0);
 	}
 
+	getTrimmedText () {
+		let ret = this.text.slice(0);
+		while (!ret[0].length)
+			ret.shift();
+		while (!ret[ret.length-1].length)
+			ret.pop();
+		return ret;
+	}
+
+	getCompactText () {
+		let trimmed = this.getTrimmedText();
+		return trimmed.map((row) => row.trim()).join(" ");
+	}
+
+	getTrimmedRowCount () {
+		return this.getTrimmedText().length;
+	}
+
+	/*
+	 * For bulleted rows, extract what looks like the bullet, eg ` * ` or ` - `
+	 * Accepted bullets: *, -, +, >, ->, =>, #
+	 * Bullets must be followed by space
+	 *
+	 * Returns `null` if no bullet or the bullet string if a bullet was found
+	 */
+	extractRowBullet (row) {
+		let bullet = row.match(/^[ \t]*(\*|\-|\+|>|\->|\=>|#)[ \t]+/);
+		if (bullet === null)
+			return null;
+		return bullet[0];
+	}
+
+	/*
+	 * A section is a bullet section if it ends with one or more identical bullet
+	 * lines
+	 */
+	extractSectionBullet (section) {
+		let bullet = null;
+		for (let i=0; i<section.length; i++) {
+			if (section[i] === "")
+				continue;
+			let rowBullet = this.extractRowBullet(section[i]);
+			if (rowBullet !== null) {
+				if (bullet === null)
+					bullet = rowBullet;
+				if (bullet !== rowBullet)
+					return null;
+			}
+			else if (bullet !== null) {
+				if (section[i].slice(0, bullet.length) !== util.strFill(bullet.length))
+					return null;
+			}
+		}
+		return bullet;
+	}
+
+	/*
+	 * Section fields:
+	 * - `text`: string, the paragraph text (without bullet text)
+	 * - `bullet`: string, bullet for this section
+	 * - `bulletText`: array of sections, the text contained in the bullets (allows for nested bullets)
+	 * - `indent`: string, indentation for this section
+	 * - `startingRow`: number, starting row for this section
+	 * - `rowCount`: number, row count for this section
+	 * - `rowsBefore`: number, empty rows before this section
+	 * - `rowsAfter`: number, empty rows after this section
+	 */
+	getSections () {
+		let ret = [];
+		let text = this.text.slice(0);
+		let empty = 0;
+		let currentRow = this.startingRow;
+		let previous = null;
+		let current = null;
+		let queue = [];
+
+		let newSection = function (currentRow, empty, text) {
+			return {
+				text: text !== undefined ? [ text ] : [],
+				bullet: null,
+				bulletText: [],
+				indent: null,
+				startingRow: currentRow,
+				rowCount: 0,
+				rowsBefore: empty,
+				rowsAfter: 0
+			};
+		};
+
+		let closeSection = function (section, currentRow) {
+			section.indent = util.getIndent(section.text);
+			section.text = util.trim(section.text).join(" ");
+			section.rowCount = currentRow - section.startingRow;
+		};
+
+		// section ends if an empty row is found or if the bullet section ends
+		while (text.length) {
+
+			let sectionEnd = false;
+
+			// get next row
+			let row = text.shift();
+
+			if (row.length === 0) {
+				// if empty row, count it and mark section end if we are currently parsing a section
+				if (current !== null)
+					sectionEnd = true;
+				empty++;
+			}
+			else {
+				// if row is not empty, create a new section if not created yet and store the
+				// empty row count in previous section if any
+				if (current === null) {
+					current = newSection(currentRow, empty);
+					if (previous !== null)
+						previous.rowsAfter = empty;
+					empty = 0;
+				}
+				// check if row is part of a bulleted list
+				let bullet = this.extractRowBullet(row);
+				if (bullet !== null) {
+					// we have three options
+					if (current.bullet === null) {
+						// first bullet in the section
+						current.bullet = bullet;
+						current.bulletText.push(row.slice(current.bullet.length));
+						row = null;
+					}
+					else if (current.bullet && current.bullet === bullet) {
+						// same as other bullets
+						current.bulletText.push(row.slice(current.bullet.length));
+						row = null;
+					}
+					else {
+						// different kind of bullet, either turn the last bullet into a new section so we can nest this
+						// or go back to a previous section if this bullet is found in the previous list
+						let queueIndex = -1;
+						for (let i=0; i<queue.length; i++) {
+							if (queue[i].bullet === bullet) {
+								queueIndex = i;
+								break;
+							}
+						}
+						if (queueIndex === -1) {
+							// not found, create new nested bullet
+							current.bulletText[current.bulletText.length - 1] =
+								newSection(currentRow - current.text.length - empty,
+									empty, current.bulletText[current.bulletText.length - 1]);
+							queue.push(current);
+							current = current.bulletText[current.bulletText.length - 1];
+							current.bullet = bullet;
+							current.bulletText.push(row.slice(current.bullet.length));
+							row = null;
+						}
+						else {
+							// found, close all queues up to that point
+							while (queue.length > queueIndex) {
+								closeSection(current, currentRow);
+								current = queue.pop();
+							}
+							current.bulletText.push(row.slice(current.bullet.length));
+						}
+					}
+				}
+				else {
+					// this row has no bullet, we have three options
+					if (current.bullet === null) {
+						// if section does not have bullets yet, append to current section
+						current.text.push(row);
+						row = null;
+					}
+					else {
+						// section has bullets
+						if (row.slice(0, current.bullet.length) === util.strFill(current.bullet.length, " ")) {
+							// part of a previous bullet
+							current.bulletText.push(util.trim(current.bulletText.pop()) + " " + util.trim(row));
+						}
+						else {
+							// this row is not part of previous bullet, so we have to start a new section
+							// not setting row to null will add it to the new section when created
+							sectionEnd = true;
+							// put the row back so it's processed when doing the next section
+							text.unshift(row);
+							currentRow--;
+						}
+					}
+				}
+			}
+
+			// we are at the end of a section, we have to push it to the returned list
+			// and set the previous reference to it
+			if (sectionEnd) {
+				// close all sections in the queue
+				while (queue.length > 0) {
+					closeSection(current, currentRow);
+					current = queue.pop();
+				}
+				// close the one current section and push it to the returned array
+				if (current !== null) {
+					closeSection(current, currentRow);
+					ret.push(current);
+				}
+				previous = current;
+				current = null;
+			}
+
+			currentRow++;
+
+		}
+
+		return ret;
+	}
+
 	toString () {
 		let ret = [ super.toString() ];
 
@@ -557,6 +790,26 @@ class FunctionBlock extends CodeBlock {
 		return this.identifier.type;
 	}
 
+	getExportedName () {
+		if (this.exportedName)
+			return this.exportedName;
+		return this.identifier.name;
+	}
+
+	getNamespacePath () {
+		let ret = [];
+		let target = this;
+		while (target) {
+			let name = target.getExportedName();
+			if (name !== "<empty>")
+				ret.unshift(name);
+			if (!(target.getParent instanceof Function))
+				break;
+			target = target.getParent();
+		}
+		return ret;
+	}
+
 	getArguments () {
 		return this.args.slice(0);
 	}
@@ -570,8 +823,10 @@ class FunctionBlock extends CodeBlock {
 		let head = this.getPrev(1, CommentBlock);
 		if (head === null)
 			return;
-		if (head.getDirectivesByVerb("@parse").length > 0)
+		if (head.getDirectivesByVerb("@parse").length > 0) {
 			this.contentBlock = new ContentBlock(this.body, this.startingRow);
+			this.contentBlock.setParent(this);
+		}
 	}
 
 	toString () {
@@ -618,6 +873,26 @@ class VariableBlock extends CodeBlock {
 		return this.identifier.type;
 	}
 
+	getExportedName () {
+		if (this.exportedName)
+			return this.exportedName;
+		return this.identifier.name;
+	}
+
+	getNamespacePath () {
+		let ret = [];
+		let target = this;
+		while (target) {
+			let name = target.getExportedName();
+			if (name !== "<empty>")
+				ret.unshift(name);
+			if (!(target.getParent instanceof Function))
+				break;
+			target = target.getParent();
+		}
+		return ret;
+	}
+
 	getValue () {
 		return this.value;
 	}
@@ -658,6 +933,7 @@ class ClassBlock extends CodeBlock {
 		this.body = util.deindentBlock(this.content.slice(k+1).replace(/};?$/, ""));
 
 		this.contentBlock = new ContentBlock(this.body, this.startingRow);
+		this.contentBlock.setParent(this);
 	}
 
 	getIdentifierName () {
@@ -666,6 +942,12 @@ class ClassBlock extends CodeBlock {
 
 	getIdentifierType () {
 		return this.identifier.type;
+	}
+
+	getExportedName () {
+		if (this.exportedName)
+			return this.exportedName;
+		return this.identifier.name;
 	}
 
 	getSuperName () {
@@ -678,6 +960,10 @@ class ClassBlock extends CodeBlock {
 
 	getBody () {
 		return this.body;
+	}
+
+	getContentBlock () {
+		return this.contentBlock;
 	}
 
 	buildMeta () {
@@ -744,6 +1030,24 @@ class MethodBlock extends CodeBlock {
 
 	getArguments () {
 		return this.args.slice(0);
+	}
+
+	getExportedName () {
+		if (this.exportedName)
+			return this.exportedName;
+		return this.name;
+	}
+
+	getNamespacePath () {
+		let ret = [ this.getExportedName() ];
+		let target = this.getParent();
+		if (target === null)
+			return ret;
+		target = target.getParent();
+		if (target === null)
+			return ret;
+		ret.unshift(target.getExportedName());
+		return ret;
 	}
 
 	toString () {
@@ -840,6 +1144,7 @@ class ContentBlock extends CodeBlock {
 			let block = new CodeBlock(content, row);
 			content = content.slice(block.getContentLength());
 			let specific = block.toSpecificInstance();
+			specific.setParent(this);
 			this.blocks.push(specific);
 
 			// store the rows before in this block instance
@@ -884,6 +1189,10 @@ class ContentBlock extends CodeBlock {
 		}
 	}
 
+	getExportedName () {
+		return "<empty>";
+	}
+
 	getContentLength () {
 		return this.content.length;
 	}
@@ -896,10 +1205,40 @@ class ContentBlock extends CodeBlock {
 		return this.blocks.slice(0);
 	}
 
+	getFirstBlock () {
+		return this.blocks[0];
+	}
+
+	getBlockByFieldName (name) {
+		for (let i=0; i<this.blocks.length; i++) {
+			if (this.blocks[i].getFieldName instanceof Function)
+				if (this.blocks[i].getFieldName() === name)
+					return this.blocks[i];
+		}
+		return null;
+	}
+
+	getBlockByIdentifierName (name) {
+		for (let i=0; i<this.blocks.length; i++) {
+			if (this.blocks[i].getIdentifierName instanceof Function)
+				if (this.blocks[i].getIdentifierName() === name)
+					return this.blocks[i];
+		}
+		return null;
+	}
+
 	getBlocksByType (type) {
 		let ret = [];
 		for (let i=0; i<this.blocks.length; i++)
 			if (this.blocks[i].getType() === type)
+				ret.push(this.blocks[i]);
+		return ret;
+	}
+
+	getBlocksByInstance (instance) {
+		let ret = [];
+		for (let i=0; i<this.blocks.length; i++)
+			if (this.blocks[i] instanceof instance)
 				ret.push(this.blocks[i]);
 		return ret;
 	}
@@ -915,6 +1254,7 @@ class ContentBlock extends CodeBlock {
 
 CodeBlock.AssignmentBlock = AssignmentBlock;
 CodeBlock.ClassBlock = ClassBlock;
+CodeBlock.MethodBlock = MethodBlock;
 CodeBlock.VariableBlock = VariableBlock;
 CodeBlock.FunctionBlock = FunctionBlock;
 CodeBlock.RequireBlock = RequireBlock;

@@ -2,6 +2,7 @@ const fs = require("fs");
 
 const CodeTree = require("./src/codetree.js");
 const CodeUnit = require("./src/codeunit.js");
+const DirectiveEngine = require("./src/directive_engine.js");
 const Generator = require("./src/generator.js");
 
 const util = require("./src/util.js");
@@ -23,8 +24,12 @@ for (let i=0; i<units.length; i++) {
 	tree.linkUnit(unit);
 }
 
-let generator = new Generator(tree);
+// apply directives
+let directiveEngine = new DirectiveEngine(tree);
+directiveEngine.runDirectives();
 
+// generate file content
+let generator = new Generator(tree);
 let content = generator.generateFileContent({}, 2);
 
 for (let i=0; i<content.length; i++) {

@@ -47,6 +47,15 @@ const DEFAULT_SETTINGS = {
 		// max rows for section titles
 		sectionTitleMaxRows: 1
 	},
+	// these settings apply to the structure of the output
+	structure: {
+		// wether or not to generate entries for aliases in output
+		generateAliasEntries: true,
+		// wether or not to expand aliases or just refer to the aliased item
+		expandAliases: true,
+		// wether or not to group aliases together at the end or display them with the other items
+		groupAliasesTogether: false
+	},
 	// these settings apply to output and style
 	output: {
 		// min width of output text (don't wrap beyond this point) (0 = none)
@@ -412,6 +421,7 @@ class Generator {
 		text.push({ style: "h" + (headerDepth + 1), text: "Member methods" });
 
 		let subText = [];
+		let endText = [];
 
 		let blocks = contentBlock.getBlocksByInstance(MethodBlock);
 		for (let i=0; i<blocks.length; i++) {
@@ -420,14 +430,53 @@ class Generator {
 			comment = blocks[i].getPrev(1, CommentBlock);
 			subText = subText.concat(this.generateFunctionDocumentation(
 				blocks[i], comment, settings, headerDepth + 2, { type: "method" }));
+			if (settings.structure.generateAliasEntries) {
+				let aliases = blocks[i].getAliases();
+				for (let j=0; j<aliases.length; j++) {
+					let aliasDocumentation = this.generateFunctionDocumentation(
+						blocks[i], comment, settings, headerDepth + 2,
+						{ type: "method", alias: aliases[j] });
+					if (settings.structure.groupAliasesTogether)
+						endText = endText.concat(aliasDocumentation);
+					else
+						subText = subText.concat(aliasDocumentation);
+				}
+			}
 		}
 
-		if (subText.length) {
+		if (subText.length || endText.length) {
 			text.push({ style: "p", text: "This class defines the following member methods" });
 			text = text.concat(subText);
+			text = text.concat(endText);
 		}
 		else
 			text.push({ style: "p", text: "This class does not define any member methods" });
+
+		subText = [];
+		let fields = classBlock.getAssignedFieldsList();
+		for (let i in fields) {
+			subText.push({ style: "h" + (headerDepth + 2), text: i });
+			let titleComment = this.getTitleComment(fields[i], settings);
+			let commentBlock = fields[i].getPrev(0);
+			if (commentBlock === titleComment || !(commentBlock instanceof CommentBlock))
+				commentBlock = null;
+			if (commentBlock === null && titleComment)
+				subText.push({ style: "p", text: titleComment.getCompactText() });
+			if (commentBlock && titleComment === null)
+				subText.push({ style: "p", text: commentBlock.getCompactText() });
+			if (commentBlock && titleComment)
+				subText.push({ style: "p",
+					text: commentBlock.getCompactText() + " (" + titleComment.getCompactText() + ")"
+				});
+			subText.push({ style: "l1", text: "declared as `" + fields[i].getIdentifierType() + " " +
+				fields[i].getIdentifierName() + "`" });
+			subText.push({ style: "l1", text: "initial value: `" + fields[i].getValue() + "`" });
+		}
+
+		if (subText.length) {
+			text.push({ style: "h" + (headerDepth + 1), text: "Fields and Properties" });
+			text = text.concat(subText);
+		}
 
 		return text;
 	}
@@ -444,25 +493,46 @@ class Generator {
 			meta.type = "function";
 
 		let args = functionBlock.getArguments();
+
+		// get all name elements in an array that will be joined with . after
 		let name;
+		let aliasedName;
 		if (meta.type === "constructor")
-			name = "Constructor";
+			name = [ "Constructor" ];
 		else {
 			if (meta.exported || meta.type === "method") {
+				// if it's an exported function, output the full path
 				let path = functionBlock.getNamespacePath();
 				if (meta.type === "method") {
+					// if this is a method, insert the "prototype" object in the path
 					name = path.pop();
 					path.push("prototype");
 					path.push(name);
 				}
-				name = path.join(".") + " (" + args.join(", ") + ")";
+				name = path;
 			}
 			else
-				name = functionBlock.getIdentifierName() + " (" + args.join(", ") + ")";
+				name = [ functionBlock.getIdentifierName() ];
 		}
+
+		// if this is an alias, replace the last element in the name with the alias name
+		if (meta.alias) {
+			aliasedName = name.join(".");
+			name[name.length-1] = meta.alias;
+		}
+
+		name = name.join(".") + " (" + args.join(", ") + ")";
 
 		if (headerDepth)
 			text.push({ style: "h" + headerDepth, text: name });
+
+		// if this is an alias, present this information
+		if (meta.alias) {
+			text.push({ style: "p", text: "Alias of `" + aliasedName + "`"});
+			// continue only if expandAliases is set to true
+			if (!settings.structure.expandAliases)
+				return text;
+		}
 
 		// if no comment is provided, just list the arguments
 		if (commentBlock === null) {
@@ -474,6 +544,14 @@ class Generator {
 		}
 		else
 			text = text.concat(this.commentBlockToText(commentBlock, settings));
+
+		// list aliases
+		let aliases = functionBlock.getAliases();
+		if (meta.alias)
+			aliases.splice(aliases.indexOf(meta.alias), 1);
+		if (aliases.length)
+			text.push({ style: "p", text: (meta.alias !== undefined ? "**Other aliases:** " : "**Aliases:** ") +
+				"`" + aliases.join("`, `") + "`" });
 
 		return text;
 	}
@@ -553,6 +631,30 @@ class Generator {
 		return true;
 	}
 
+	getTitleComment (block, settings) {
+		// go up to the first block of this type and ignore comments
+		let current = block;
+		let firstBlock = block;
+
+		while (current.getType() === block.getType() || (current instanceof CommentBlock)) {
+			// break on double comment blocks
+			if ((current instanceof CommentBlock) && (current.getPrev(0) instanceof CommentBlock))
+				break;
+			if (!(current instanceof CommentBlock))
+				firstBlock = current;
+			current = current.getPrev(0);
+		}
+
+		// try to get a title comment
+		let titleComment = firstBlock.getPrev(0);
+		if (titleComment instanceof CommentBlock && this.isTitleComment(titleComment.getPrev(0), settings))
+			titleComment = titleComment.getPrev(0);
+		else if (!this.isTitleComment(titleComment, settings))
+			titleComment = null;
+
+		return titleComment;
+	}
+
 	groupVarDeclarations (contentBlock, settings) {
 		let ret = [];
 
@@ -563,11 +665,7 @@ class Generator {
 			let section = { variables: [] };
 
 			// try to get a title comment
-			let titleComment = current.getPrev(0);
-			if (titleComment instanceof CommentBlock && this.isTitleComment(titleComment.getPrev(0), settings))
-				titleComment = titleComment.getPrev(0);
-			else if (!this.isTitleComment(titleComment, settings))
-				titleComment = null;
+			let titleComment = this.getTitleComment(current, settings);
 
 			if (titleComment === null) {
 				if (noTitleGroup === null)

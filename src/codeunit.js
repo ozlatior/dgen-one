@@ -43,6 +43,7 @@ class CodeUnit {
 	}
 
 	buildMeta () {
+		this.meta = {};
 		this.declaredClasses = [];
 		this.declaredFunctions = [];
 		this.declaredValues = [];
@@ -146,6 +147,10 @@ class CodeUnit {
 
 	getBlocksByInstance (instance) {
 		return this.contentBlock.getBlocksByInstance(instance);
+	}
+
+	getBlockByPath (path) {
+		return this.contentBlock.getBlockByPath(path);
 	}
 
 	getFirstBlock () {
@@ -284,6 +289,18 @@ class CodeUnit {
 
 	setExportedName (name) {
 		this.exportedName = name;
+	}
+
+	getMeta (field) {
+		if (field === undefined)
+			return this.meta;
+		return this.meta[field];
+	}
+
+	setMeta (field, value) {
+		if (field === undefined)
+			return false;
+		this.meta[field] = value;
 	}
 
 	toString () {

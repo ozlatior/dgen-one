@@ -85,6 +85,8 @@ class CodeBlock {
 			this.rowsBefore = content.getRowsBefore();
 			this.rowsAfter = content.getRowsAfter();
 			this.exportedName = content.getExportedName();
+			this.aliases = [];
+			this.assignedFields = {};
 			this._parent = content.getParent();
 		}
 		else {
@@ -154,6 +156,44 @@ class CodeBlock {
 
 	setExportedName (name) {
 		this.exportedName = name;
+	}
+
+	getAliases () {
+		return this.aliases.slice(0);
+	}
+
+	setAliases (aliases) {
+		this.aliases = aliases.slice(0);
+	}
+
+	addAlias (alias) {
+		if (this.aliases.indexOf(alias) !== -1)
+			return false;
+		this.aliases.push(alias);
+		return true;
+	}
+
+	clearAliases () {
+		this.aliases = [];
+	}
+
+	getAliasCount () {
+		return this.aliases.length;
+	}
+
+	assignField (field, value) {
+		this.assignedFields[field] = value;
+	}
+
+	getAssignedFields () {
+		return this.assignedFields;
+	}
+
+	getAssignedFieldNames () {
+		let ret = [];
+		for (let i in this.assignedFields)
+			ret.push(i);
+		return ret;
 	}
 
 	getParent () {
@@ -431,13 +471,17 @@ class CommentBlock extends CodeBlock {
 				let row = util.clean(this.text[i]).split(" ");
 				let dir = row.shift();
 				this.directives.push({
-					verb: dir,
+					verb: dir.slice(1),
 					args: row
 				});
 				this.text.splice(i, 1);
 				i--;
 			}
 		}
+	}
+
+	hasDirectives () {
+		return this.directives.length > 0;
 	}
 
 	getDirectives () {
@@ -818,12 +862,16 @@ class FunctionBlock extends CodeBlock {
 		return this.body;
 	}
 
+	getContentBlock () {
+		return this.contentBlock ? this.contentBlock : null;
+	}
+
 	buildMeta () {
 		// only build meta if the first level 1 of this block contains the @parse directive
 		let head = this.getPrev(1, CommentBlock);
 		if (head === null)
 			return;
-		if (head.getDirectivesByVerb("@parse").length > 0) {
+		if (head.getDirectivesByVerb("parse").length > 0) {
 			this.contentBlock = new ContentBlock(this.body, this.startingRow);
 			this.contentBlock.setParent(this);
 		}
@@ -964,6 +1012,29 @@ class ClassBlock extends CodeBlock {
 
 	getContentBlock () {
 		return this.contentBlock;
+	}
+
+	getBlockByPath (path) {
+		let first = path[0];
+		if (first === "prototype")
+			return this.contentBlock.getBlockByPath(path.slice(1));
+		// TODO: handle cases which don't address the prototype object
+		return null;
+	}
+
+	getAssignedFieldsList () {
+		return this.contentBlock.getAssignedFieldsList([ this.getExportedName(), "prototype" ]);
+	}
+
+	getAssignedFieldsTree () {
+		let ret = {};
+		let tree = this.contentBlock.getAssignedFieldsTree();
+		ret[this.getExportedName()] = { prototype: tree };
+		return ret;
+	}
+
+	getAssignedFieldsPaths () {
+		return this.contentBlock.getAssignedFieldsPaths([ this.getExportedName(), "prototype" ]);
 	}
 
 	buildMeta () {
@@ -1240,6 +1311,64 @@ class ContentBlock extends CodeBlock {
 		for (let i=0; i<this.blocks.length; i++)
 			if (this.blocks[i] instanceof instance)
 				ret.push(this.blocks[i]);
+		return ret;
+	}
+
+	getBlockByPath (path) {
+		let first = this.getBlockByIdentifierName(path[0]);
+		if (first === null)
+			first = this.getBlockByFieldName(path[0]);
+		if (path.length === 1)
+			return first;
+		if (first && (first.getBlockByPath instanceof Function))
+			return first.getBlockByPath(path.slice(1));
+		return null;
+	}
+
+	getAssignedFieldsList (path) {
+		if (path === undefined)
+			path = [];
+		let ret = {};
+		for (let i=0; i<this.blocks.length; i++) {
+			let fields = this.blocks[i].getAssignedFields();
+			for (let j in fields) {
+				let field = path.slice(0);
+				field.push(this.blocks[i].getExportedName());
+				field.push(j);
+				ret[field.join(".")] = fields[j];
+			}
+		}
+		return ret;
+	}
+
+	getAssignedFieldsTree (tree) {
+		if (tree === undefined)
+			tree = {};
+		for (let i=0; i<this.blocks.length; i++) {
+			let fields = this.blocks[i].getAssignedFields();
+			let exportedName = this.blocks[i].getExportedName();
+			for (let j in fields) {
+				if (tree[exportedName] === undefined)
+					tree[exportedName] = {};
+				tree[exportedName][j] = fields[j];
+			}
+		}
+		return tree;
+	}
+
+	getAssignedFieldsPaths (path) {
+		if (path === undefined)
+			path = [];
+		let ret = [];
+		for (let i=0; i<this.blocks.length; i++) {
+			let fields = this.blocks[i].getAssignedFields();
+			for (let j in fields) {
+				let toPush = path.slice(0);
+				toPush.push(this.blocks[i].getExportedName());
+				toPush.push(j);
+				ret.push(toPush);
+			}
+		}
 		return ret;
 	}
 

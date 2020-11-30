@@ -964,9 +964,8 @@ class Generator {
 
 	/*
 	 * Based on settings object, generate text content and return it as an array of objects
-	 * 
-	 * Settings object:
-	 *
+	 * - `settings`: settings object
+	 * - `headerDepth`: number, starting header depth (defaults to 1)
 	 * Returned array elements:
 	 * - `path`: relative path to the file
 	 * - `content`: file content as rows
@@ -990,7 +989,7 @@ class Generator {
 		for (let i=0; i<objects.length; i++) {
 			ret.push({
 				path: util.joinPaths(settings.paths.baseCodePath, objects[i].getPath() + ".rst"),
-				content: this.generateCodeDocumentation(objects[i], settings, headerDepth)
+				content: this.generateCodeDocumentation(objects[i], settings, headerDepth + 1)
 			});
 		}
 

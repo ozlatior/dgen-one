@@ -40,6 +40,22 @@ const DEFAULT_SETTINGS = {
 		// wether or not to group aliases together at the end or display them with the other items
 		groupAliasesTogether: false
 	},
+	// these settings determine what is included in the project structure
+	project: {
+		// read directories recursively
+		recursive: true,
+		// regex patterns, exclude these paths (relative to project base path)
+		excludePaths: [ "^./documentation" ],
+		// regex patterns, include these paths
+		// (even if excluded and even if not recursively reading dirs, relative to project base path)
+		includePaths: [],
+		// regex patterns, filenames to exclude
+		excludeFiles: [],
+		// regex patterns, filenames to include (only these will be considered if any is present)
+		includeOnly: [ ".+js$" ],
+		// path to project meta (can be package.json or another file, relative to project base path)
+		projectMeta: "./package.json",
+	},
 	// these settings apply to output and style
 	output: {
 		// min width of output text (don't wrap beyond this point) (0 = none)
@@ -61,6 +77,8 @@ const DEFAULT_SETTINGS = {
 	},
 	// output paths
 	paths: {
+		// path to documentation output (absolute or relative to base path)
+		outputPath: "./documentation",
 		// base path for code file documentation output
 		baseCodePath: "code",
 		// base path for intro sections

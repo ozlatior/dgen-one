@@ -15,12 +15,12 @@ let units = [
 
 let tree = new CodeTree();
 
-tree.linkUnit(new CodeUnit(fs.readFileSync("./sample/index.js").toString(), 1, "./sample/index.js",
+tree.linkUnit(new CodeUnit(fs.readFileSync("./sample/index.js").toString(), 1, "./index.js",
 	"Library Root", "Exposes the main Assert class"));
 
 for (let i=0; i<units.length; i++) {
 	let code = fs.readFileSync(units[i]).toString();
-	let unit = new CodeUnit(code, 1, units[i]);
+	let unit = new CodeUnit(code, 1, "./" + units[i].split("/").slice(2).join("/"));
 	tree.linkUnit(unit);
 }
 
@@ -30,12 +30,16 @@ directiveEngine.runDirectives();
 
 // generate file content
 let generator = new Generator(tree);
+
+generator.setProjectMeta(fs.readFileSync("./package.json").toString());
+
 let content = generator.generateFileContent({}, 2);
 
 for (let i=0; i<content.length; i++) {
-	let path = util.joinPaths(
-		"./sample/doc/generated",
-		content[i].path.split("/").slice(2).join("/").replace(/\.js$/, ".rst")
-	);
+	let path = util.joinPaths("./sample/doc/generated", content[i].path);
+	let dir = path.split("/").slice(0, -1).join("/");
+	if (!fs.existsSync(dir)) {
+	    fs.mkdirSync(dir, { recursive: true });
+	}
 	fs.writeFileSync(path, content[i].content.join("\n"));
 }

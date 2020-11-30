@@ -15,6 +15,9 @@
  * in the code
  */
 
+const fs = require("fs");
+const path = require("path");
+
 const CodeBlock = require("./codeblock.js");
 
 const CommentBlock = CodeBlock.CommentBlock;
@@ -27,6 +30,10 @@ const AssignmentBlock = CodeBlock.AssignmentBlock;
 const ContentBlock = CodeBlock.ContentBlock;
 
 const util = require("./util.js");
+
+const DEFAULT_CONF_PY_TEMPLATE = fs.readFileSync(path.join(__dirname, "../templates/conf.py.template")).toString();
+const DEFAULT_MAKEFILE_TEMPLATE = fs.readFileSync(path.join(__dirname, "../templates/Makefile.template")).toString();
+const DEFAULT_MAKE_BAT_TEMPLATE = fs.readFileSync(path.join(__dirname, "../templates/make.bat.template")).toString();
 
 /*
  * Default settings object
@@ -49,6 +56,14 @@ const DEFAULT_SETTINGS = {
 	},
 	// these settings apply to the structure of the output
 	structure: {
+		// generate conf.py file
+		generateConfPy: true,
+		// generate Makefile
+		generateMakefile: true,
+		// generate make.bat
+		generateMakeBat: true,
+		// generate index.rst file
+		generateIndex: true,
 		// wether or not to generate entries for aliases in output
 		generateAliasEntries: true,
 		// wether or not to expand aliases or just refer to the aliased item
@@ -63,7 +78,32 @@ const DEFAULT_SETTINGS = {
 		// max width of output text (wrap text by breaking on spaces after this limit)
 		maxColumns: 120,
 		// characters to use for underlining section titles, in order of rank (h1-...)
-		sectionUnderlines: [ "**", "==", "=", "~", "-" ]
+		sectionUnderlines: [ "**", "==", "=", "~", "-" ],
+		// sphinx extensions
+		sphinxExtensions: [],
+		// sphinx templates paths
+		sphinxTemplates: [ "_templates" ],
+		// sphinx exculde patterns
+		sphinxExculdePatterns: [ "_build", "Thumbs.db", ".DS_Store" ],
+		// sphinx html theme
+		sphinxHtmlTheme: "alabaster",
+		// sphinx html static path
+		sphinxHtmlStaticPath: [ "_static" ]
+	},
+	// output paths
+	paths: {
+		// base path for code file documentation output
+		baseCodePath: "code",
+		// base path for intro sections
+		baseIntroPath: "intro",
+		// base path for ending sections
+		baseEndingPath: "endnotes",
+		// base path for classes
+		baseClassPath: "classes",
+		// base path for functions
+		baseFunctionPath: "functions",
+		// base path for other exported values
+		baseExportedPath: "exported"
 	}
 };
 
@@ -80,8 +120,66 @@ class Generator {
 		this.settings = settings !== undefined ? settings : {};
 		this.introSections = [];
 		this.endingSections = [];
+		this.templates = {};
+		this.project = {};
+		this.confPyTemplate = DEFAULT_CONF_PY_TEMPLATE;
+		this.makefileTemplate = DEFAULT_MAKEFILE_TEMPLATE;
+		this.makeBatTemplate = DEFAULT_MAKE_BAT_TEMPLATE;
 
 		util.applyDefaults(this.settings, DEFAULT_SETTINGS);
+	}
+
+	/*
+	 * Set project meta from object (key-value pairs); Only specified keys will be set/replaced
+	 * `meta`: object, metadata in package.json format; Relevant fields
+	 * - `name`: string, project name
+	 * - `copyright`: string, copyright information
+	 * - `author`: string, author name
+	 * - `version`: string, version number, including tags
+	 */
+	setProjectMeta (meta) {
+		if (typeof(meta) === "string")
+			meta = JSON.parse(meta);
+		if (meta.name)
+			this.project.name = meta.name;
+		if (meta.copyright)
+			this.project.copyright = meta.copyright;
+		if (meta.author)
+			this.project.author = meta.author;
+		if (meta.version)
+			this.project.version = meta.version;
+		if (!(this.project.name))
+			this.project.name = "Unnamed Project";
+		if (!(this.project.author))
+			this.project.author = "Unknown Author";
+		if (!(this.project.copyright))
+			this.project.copyright = (new Date()).getFullYear() + ", " + this.project.author;
+		if (!(this.project.version))
+			this.project.version = "0.0.1";
+	}
+
+	/*
+	 * Set conf.py template to replace the defaults loaded at object creation
+	 * `template`: string, template contents
+	 */
+	setConfPyTemplate (template) {
+		this.confPyTemplate = template;
+	}
+
+	/*
+	 * Set Makefile template to replace the defaults loaded at object creation
+	 * `template`: string, template contents
+	 */
+	setMakefileTemplate (template) {
+		this.makefileTemplate = template;
+	}
+
+	/*
+	 * Set make.bat template to replace the defaults loaded at object creation
+	 * `template`: string, template contents
+	 */
+	setConfPyTemplate (template) {
+		this.makeBatTemplate = template;
 	}
 
 	/*
@@ -130,6 +228,14 @@ class Generator {
 				if (before.style !== after.style)
 					ret.push("");
 				break;
+			case "dl":
+				if (before.style !== "dl" && before.style !== "dh")
+					ret.push("");
+				break;
+			case "db":
+				if (before.style !== "db" && before.style !== "dh")
+					ret.push("");
+				break;
 			case "h1":
 			case "h2":
 			case "h3":
@@ -140,10 +246,36 @@ class Generator {
 				break;
 			case "p":
 			case "b":
+			case "c":
+			case "dh":
 			default:
 				ret.push("");
 		}
 		return ret;
+	}
+
+	/*
+	 * Intro sections are files to be included before the actual documentation
+	 * `path`: string, path for this file
+	 * `content`: content for this file (string or rows), this will be copied directly
+	 */
+	addIntroSection (path, content) {
+		this.introSections.push({
+			path: path,
+			content: content
+		});
+	}
+
+	/*
+	 * Ending sections are files to be included after the actual documentation
+	 * `path`: string, path for this file
+	 * `content`: content for this file (string or rows), this will be copied directly
+	 */
+	addEndingSection (path, content) {
+		this.endingSections.push({
+			path: path,
+			content: content
+		});
 	}
 
 	/*
@@ -188,6 +320,20 @@ class Generator {
 
 		// text
 		switch (section.style) {
+			case "c":
+				ret = ret.concat(util.padBlock(
+					util.wrapText(section.text, max - 3, min), { firstRow: ".. ", otherRows: "", width: 3 }
+				));
+				break;
+			case "dh":
+				ret.push(".. " + section.text + "::");
+				break;
+			case "db":
+				ret.push("   " + section.text);
+				break;
+			case "dl":
+				ret.push("   :" + section.text);
+				break;
 			case "b":
 				ret = ret.concat(util.wrapText("**" + section.text + "**", max, min));
 				break;
@@ -787,6 +933,102 @@ class Generator {
 		return this.textToOutputRows(ret, settings);
 	}
 
+	/*
+	 * Generate Index with Table of Contents from file content
+	 */
+	generateIndex (files, settings) {
+		let ret = [];
+
+		ret.push({ style: "c", text: this.project.name + " Documentation master file, created by " +
+			"dgen-one documentation generator on " + (new Date()).toGMTString() + ". " +
+			"You can adapt this file completely to your liking, but it should at least contain the " +
+			"root `toctree` directive." });
+
+		ret.push({ style: "h1", text: this.project.name + " Documentation" });
+
+		ret.push({ style: "dh", text: "toctree" });
+		ret.push({ style: "dl", text: "maxdepth: 2" });
+		ret.push({ style: "dl", text: "caption: Contents:" });
+
+		for (let i=0; i<files.length; i++)
+			ret.push({ style: "db", text: files[i].path });
+
+		ret.push({ style: "h1", text: "Indices and tables" });
+
+		ret.push({ style: "l1", text: ":ref:`genindex`" });
+		ret.push({ style: "l1", text: ":ref:`modindex`" });
+		ret.push({ style: "l1", text: ":ref:`search`" });
+
+		return this.textToOutputRows(ret, settings);
+	}
+
+	formatArray (arr) {
+		if (!arr)
+			return "[]";
+		let ret = arr.map((el) => {
+			if (typeof(el) === "string")
+				return "'" + el + "'";
+			return el;
+		});
+		return "[" + ret.join(", ") + "]";
+	}
+
+	replaceTemplateToken (row, token, settings) {
+		let ret = [];
+		let rep = "%" + token + "%";
+		switch (token) {
+			case "name":
+			case "copyright":
+			case "author":
+				ret.push(row.replace(rep, this.project[token]));
+				break;
+			case "release":
+				ret.push(row.replace(rep, this.project.version));
+				break;
+			case "extensions":
+				ret.push(row.replace(rep, this.formatArray(settings.output.sphinxExtensions)));
+				break;
+			case "templates_path":
+				ret.push(row.replace(rep, this.formatArray(settings.output.sphinxTemplates)));
+				break;
+			case "exclude_patterns":
+				ret.push(row.replace(rep, this.formatArray(settings.output.sphinxExculdePatterns)));
+				break;
+			case "html_theme":
+				ret.push(row.replace(rep, "'" + settings.output.sphinxHtmlTheme + "'"));
+				break;
+			case "html_static_path":
+				ret.push(row.replace(rep, this.formatArray(settings.output.sphinxHtmlStaticPath)));
+				break;
+		}
+		return ret;
+	}
+
+	generateConfPy (settings) {
+		let ret = [];
+		let template = this.confPyTemplate.split("\n");
+
+		let tokens = [ "name", "copyright", "author", "release",
+			"extensions", "templates_path", "exclude_patterns", "html_theme", "html_static_path" ];
+		let tokenRegexp = new RegExp("(?<=%)(" + tokens.join("|") + ")(?=%)", "g");
+
+		for (let i=0; i<template.length; i++) {
+			let row = template[i];
+			let match = row.match(tokenRegexp);
+			if (match === null)
+				ret.push(row);
+			else
+				ret = ret.concat(this.replaceTemplateToken(row, match[0], settings));
+		}
+
+		return ret;
+	}
+
+	generateFileFromTemplate (template, settings) {
+		let rows = template.split("\n");
+		return rows;
+	}
+
 	generateTextDocumentation (textUnit, settings) {
 	}
 
@@ -815,11 +1057,32 @@ class Generator {
 			objects = util.concatUnique(objects, upstream);
 		}
 
-		for (let i=0; i<objects.length; i++)
+		for (let i=0; i<objects.length; i++) {
 			ret.push({
-				path: objects[i].getPath(),
+				path: util.joinPaths(settings.paths.baseCodePath, objects[i].getPath() + ".rst"),
 				content: this.generateCodeDocumentation(objects[i], settings, headerDepth)
 			});
+		}
+
+		if (settings.structure.generateIndex) {
+			let index = this.generateIndex(ret, settings);
+			ret.push({ path: "index.rst", content: index });
+		}
+
+		if (settings.structure.generateConfPy) {
+			let confpy = this.generateConfPy(settings);
+			ret.push({ path: "conf.py", content: confpy });
+		}
+
+		if (settings.structure.generateMakefile) {
+			let content = this.generateFileFromTemplate(this.makefileTemplate, settings);
+			ret.push({ path: "Makefile", content: content });
+		}
+
+		if (settings.structure.generateMakeBat) {
+			let content = this.generateFileFromTemplate(this.makeBatTemplate, settings);
+			ret.push({ path: "make.bat", content: content });
+		}
 
 		return ret;
 	}

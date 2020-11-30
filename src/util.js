@@ -146,10 +146,11 @@ const joinPaths = function() {
 	paths = paths.join("/");
 	paths = paths.replace(/\/+/g, "/");
 	paths = paths.replace(/\/\.\//g, "/");
+	paths = paths.replace(/\/\.$/, "");
 	paths = paths.split("/");
 	for (let i=1; i<paths.length; i++) {
 		if (paths[i] === "..") {
-			paths = paths.splice(i-1, 2);
+			paths.splice(i-1, 2);
 			i -= 2;
 		}
 	}

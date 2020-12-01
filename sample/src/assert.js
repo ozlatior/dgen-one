@@ -12,8 +12,10 @@ const otherReplaceTokens = message.replaceTokens;
 /*
  * Default messages
  */
+// type assertion error message
 const MSG_ASSERT_TYPE =
 	"Wrong type for '%varName%', expected %type%, got %_TYPE_%(?funName in %funName%?)";
+// value assertion error message
 const MSG_ASSERT_VALUE =
 	"Wrong value for '%varName%', expected %expected%, got %_ACTUAL_%(?funName in %funName%?)";
 const MSG_ASSERT_FIELD_TYPES =
@@ -29,6 +31,39 @@ const MSG_ASSERT_ALLOWED_FIELDS =
 const MSG_ASSERT_FORBIDDEN_FIELDS =
 	"Field '%field%' not allowed in '%varName%'(?funName in %funName%?)";
 
+/*
+ * Default messages
+ */
+
+// type assertion error message
+const MSG_ASSERT_TYPE =
+	"Wrong type for '%varName%', expected %type%, got %_TYPE_%(?funName in %funName%?)";
+
+/* value assertion error message */
+const MSG_ASSERT_VALUE =
+	"Wrong value for '%varName%', expected %expected%, got %_ACTUAL_%(?funName in %funName%?)";
+
+const MSG_ASSERT_FIELD_TYPES =
+	"Wrong type for field '%field%' of '%varName%', expected %type%, got %actual%(?funName in %funName%?)";
+
+const MSG_ASSERT_FIELD_VALUES =
+	"Wrong value for field '%field%' of '%varName%', expected %expected%, got %_ACTUAL_%(?funName in %funName%?)";
+
+const MSG_ASSERT_OPTIONAL_FIELD_TYPES =
+	"Wrong type for field '%field%' of '%varName%', expected %type%, got %_ACTUAL_%(?funName in %funName%?)";
+
+const MSG_ASSERT_OPTIONAL_FIELD_VALUES =
+	"Wrong value for field '%field%' of '%varName%', expected %expected%, got %_ACTUAL_%(?funName in %funName%?)";
+
+const MSG_ASSERT_ALLOWED_FIELDS =
+	"Unexpected field '%field%' in '%varName%'(?funName in %funName%?)";
+
+const MSG_ASSERT_FORBIDDEN_FIELDS =
+	"Field '%field%' not allowed in '%varName%'(?funName in %funName%?)";
+
+/*
+ * Main exported class
+ */
 class Assert {
 
 	constructor () {
@@ -631,7 +666,7 @@ const getInstance = function() {
 	let ret = new Assert();
 
 	// create instance-specific calls so we can assign messages to them
-	// @rename instance arg[0]/_[a-zA-Z0-9]+$/ target/\.[a-zA-Z0-9]+$/
+	// @export Assert.prototype.{arg[0]/(?<=\.)_[a-zA-Z0-9]+$/} {target/(?<=\.)[a-zA-Z0-9]+$/}
 	ret.assertType = prototypeCall(ret._assertType, ret);
 	ret.assertValue = prototypeCall(ret._assertValue, ret);
 	ret.assertFieldTypes = prototypeCall(ret._assertFieldTypes, ret);
@@ -642,7 +677,7 @@ const getInstance = function() {
 	ret.assertForbiddenFields = prototypeCall(ret._assertForbiddenFields, ret);
 
 	// setup aliases for instance
-	// @alias instance value/\.[a-zA-Z0-9]+$/ target/\.[a-zA-Z0-9]+$/
+	// @alias Assert.prototype._{value/(?<=\.)[a-zA-Z0-9]+$/} {target/(?<=\.)[a-zA-Z0-9]+$/}
 	ret.type = ret.assertType;
 	ret.value = ret.assertValue;
 	ret.fieldTypes = ret.assertFieldTypes;
@@ -652,7 +687,7 @@ const getInstance = function() {
 	ret.allowedFields = ret.assertAllowedFields;
 	ret.forbiddenFields = ret.assertForbiddenFields;
 
-	// @alias instance value/\.[a-zA-Z0-9]+$/ target/\.[a-zA-Z0-9]+$/
+	// @alias Assert.prototype.{value/(?<=\.)[a-zA-Z0-9]+$/} {target/(?<=\.)[a-zA-Z0-9]+$/}
 	ret.eq = ret.assertEqual;
 	ret.equal = ret.assertEqual;
 	ret.neq = ret.assertNotEqual;
@@ -676,7 +711,7 @@ const getInstance = function() {
 	ret.each = ret.assertEach;
 
 	// setup default messages for instance
-	// @assign instance value/\.[a-zA-Z0-9]+$/ target
+	// @assign Assert.prototype._{target/(?<=\.)[a-zA-Z0-9]+\.message$/} {value}
 	ret.assertType.message = MSG_ASSERT_TYPE;
 	ret.assertValue.message = MSG_ASSERT_VALUE;
 	ret.assertFieldTypes.message = MSG_ASSERT_FIELD_TYPES;
@@ -712,8 +747,9 @@ class TestClass extends Assert {
 // who knows what specific custom purpose
 instance.new = getInstance;
 
-// @pattern singleton
-// @export Assert
 module.exports = instance;
 module.exports.testFunction = testFunction;
 module.exports.Assert = Assert;
+
+// @pattern singleton Assert
+// @export assert

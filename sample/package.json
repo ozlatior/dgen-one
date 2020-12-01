@@ -1,0 +1,29 @@
+{
+  "name": "assert-one",
+  "version": "0.0.1",
+  "description": "Assertion Library with custom error messages for nodejs",
+  "main": "index.js",
+  "scripts": {
+    "test": "./node_modules/mocha/bin/mocha --recursive"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "mocha": "^8.1.3"
+  },
+  "keywords": [
+    "assert",
+    "assertion",
+    "error",
+    "validation"
+  ],
+  "author": "Octav Zlatior",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ozlatior/assert-one.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ozlatior/assert-one/issues"
+  },
+  "homepage": "https://github.com/ozlatior/assert-one#readme"
+}

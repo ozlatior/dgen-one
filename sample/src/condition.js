@@ -1,16 +1,24 @@
 /*
  * Condition evaluation functions
+ *
+ * Description for this file
+ *
+ * Intro for this file.
+ * This intro contains extra information for the user, and so do subseqeunt comments
+ * before the first function/class/variable comment.
+ *
+ * This is a new paragraph.
  */
 
 /*
  * Conditions are in object form;
  * If conditions or values are in an array, it means either of the conditions have to be fullfilled
  * The object field specifies the condition operator or type, eg
- * `{ gte: 4, lte: 10, integer: true }` - between 4 and 10 inclusively, integer
- * `{ eq: [ 1, 5, 10 ] }` - either of the values 1, 5 or 10
- * `[ { eq: false }, { integer: true, gte: 0 } ]` - either `false` or any non-negative integer
+ * - `{ gte: 4, lte: 10, integer: true }` - between 4 and 10 inclusively, integer
+ * - `{ eq: [ 1, 5, 10 ] }` - either of the values 1, 5 or 10
+ * - `[ { eq: false }, { integer: true, gte: 0 } ]` - either `false` or any non-negative integer
  * Some properties can be specified through a condition:
- * `{ length: { gte: 10, lte: 20 } }` - check that string length is between 10 and 20
+ * - `{ length: { gte: 10, lte: 20 } }` - check that string length is between 10 and 20
  *
  * Condition list:
  * - `type`: string, input type equals value
@@ -33,9 +41,13 @@
  */
 
 /*
+ * Convert to string
+ *
+ *
  * Convert a value to string for messages
- * `value`: any type, value to convert to string
- * `stringify`: boolean, call stringify on elements (defaults to true)
+ * - `value`: any type, value to convert to string
+ * - `stringify`: boolean, call stringify on elements (defaults to true)
+ * Returns the converted string.
  */
 const convertToString = function(value, stringify) {
 	if (value instanceof RegExp)
@@ -48,11 +60,11 @@ const convertToString = function(value, stringify) {
 /*
  * Join List
  * Join an array as if it was a list of values
- * `list`: array, array to join
- * `option`: object:
- * - `stringify`: boolean, call stringify on elements (defaults to true)
- * - `last`: string, sequence to use for last element (defaults to " or ")
- * - `separator`: string, sequence to use as separator (defaults to ", ")
+ * - `list`: array, array to join
+ * - `option`: object:
+ *   - `stringify`: boolean, call stringify on elements (defaults to true)
+ *   - `last`: string, sequence to use for last element (defaults to " or ")
+ *   - `separator`: string, sequence to use as separator (defaults to ", ")
  * Returns a formatted string, such as [ 1, 2, 3 ] => "1, 2 or 3"
  */
 const joinList = function(list, options) {
@@ -134,8 +146,8 @@ const isInteger = function(number) {
 
 /*
  * Check that a number is exact divisor of another
- * `value`: number, the divisor
- * `multiple`: number, the multiple
+ * - `value`: number, the divisor
+ * - `multiple`: number, the multiple
  */
 const isDivisor = function(value, multiple) {
 	if (value === 0)
@@ -145,13 +157,13 @@ const isDivisor = function(value, multiple) {
 
 /*
  * Evaluate a single condition
- * `condition`: string, name of condition to evaluate
- * `value`: any type, actual value
- * `reference`: any type, value or array of possible reference values
+ * - `condition`: string, name of condition to evaluate
+ * - `value`: any type, actual value
+ * - `reference`: any type, value or array of possible reference values
  * Returns an object:
- * `result`: boolean, true if evaluation was positive
- * `actual`: any type, the actual value
- * `details`: string, a short text explaining the reference value
+ * - `result`: boolean, true if evaluation was positive
+ * - `actual`: any type, the actual value
+ * - `details`: string, a short text explaining the reference value
  */
 const evaluateSingle = function(condition, value, reference) {
 	// if reference is an array, check that any of the values is a match
@@ -378,6 +390,27 @@ const evaluateSingle = function(condition, value, reference) {
  *   for multiple conditions, this will be an object with a key for each condition
  * - `actual`: any type, the actual value
  * - `details`: string, a short text describing the failure
+ * This is a long paragraph text to test the wrap around function.
+ * This is a long paragraph text to test the wrap around function.
+ * This is a long paragraph text to test the wrap around function.
+ * This is a long paragraph text to test the wrap around function.
+ * This is a long paragraph text to test the wrap around function.
+ * This is a long paragraph text to test the wrap around function.
+ * This is a long paragraph text to test the wrap around function.
+ * This is a long paragraph text to test the wrap around function.
+ * - this bullet contains a long nested bullet
+ *   - not this one
+ *   - but this one, this needs to be wrapped around as well
+ *     but this one, this needs to be wrapped around as well
+ *     but this one, this needs to be wrapped around as well
+ *     but this one, this needs to be wrapped around as well
+ *     but this one, this needs to be wrapped around as well
+ *     but this one, this needs to be wrapped around as well
+ *     but this one, this needs to be wrapped around as well
+ *     but this one, this needs to be wrapped around as well
+ *     but this one, this needs to be wrapped around as well
+ *     but this one, this needs to be wrapped around as well
+ *   - however, this is fine
  */
 const evaluateValueCondition = function (value, condition) {
 	// if array, return true if any condition in the array validates successfully

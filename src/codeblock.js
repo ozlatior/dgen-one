@@ -522,11 +522,14 @@ class CommentBlock extends CodeBlock {
 	/*
 	 * For bulleted rows, extract what looks like the bullet, eg ` * ` or ` - `
 	 * Accepted bullets: *, -, +, >, ->, =>, #
+	 * Treats as bullets any row starting with [ `...`: ] (returns [ ``: ])
 	 * Bullets must be followed by space
 	 *
 	 * Returns `null` if no bullet or the bullet string if a bullet was found
 	 */
 	extractRowBullet (row) {
+		if (row.match(/^[ \t]*`.+`:/) !== null)
+			return row.slice(0, row.indexOf("`")) + "``:";
 		let bullet = row.match(/^[ \t]*(\*|\-|\+|>|\->|\=>|#)[ \t]+/);
 		if (bullet === null)
 			return null;
@@ -626,12 +629,18 @@ class CommentBlock extends CodeBlock {
 					if (current.bullet === null) {
 						// first bullet in the section
 						current.bullet = bullet;
-						current.bulletText.push(row.slice(current.bullet.length));
+						if (bullet.indexOf("``:") !== -1)
+							current.bulletText.push(util.trim(row));
+						else
+							current.bulletText.push(row.slice(current.bullet.length));
 						row = null;
 					}
 					else if (current.bullet && current.bullet === bullet) {
 						// same as other bullets
-						current.bulletText.push(row.slice(current.bullet.length));
+						if (bullet.indexOf("``:") !== -1)
+							current.bulletText.push(util.trim(row));
+						else
+							current.bulletText.push(row.slice(current.bullet.length));
 						row = null;
 					}
 					else {
@@ -652,7 +661,10 @@ class CommentBlock extends CodeBlock {
 							queue.push(current);
 							current = current.bulletText[current.bulletText.length - 1];
 							current.bullet = bullet;
-							current.bulletText.push(row.slice(current.bullet.length));
+							if (bullet.indexOf("``:") !== -1)
+								current.bulletText.push(util.trim(row));
+							else
+								current.bulletText.push(row.slice(current.bullet.length));
 							row = null;
 						}
 						else {
@@ -661,7 +673,10 @@ class CommentBlock extends CodeBlock {
 								closeSection(current, currentRow);
 								current = queue.pop();
 							}
-							current.bulletText.push(row.slice(current.bullet.length));
+							if (current.bullet.indexOf("``:") !== -1)
+								current.bulletText.push(util.trim(row));
+							else
+								current.bulletText.push(row.slice(current.bullet.length));
 						}
 					}
 				}

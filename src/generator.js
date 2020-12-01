@@ -155,7 +155,7 @@ class Generator {
 			case "l6":
 			case "l7":
 			case "l8":
-				if (before.style !== after.style)
+				if (before.style[0] !== "l")
 					ret.push("");
 				break;
 			case "dl":

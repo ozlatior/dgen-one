@@ -38,7 +38,9 @@ const DEFAULT_SETTINGS = {
 		// wether or not to expand aliases or just refer to the aliased item
 		expandAliases: true,
 		// wether or not to group aliases together at the end or display them with the other items
-		groupAliasesTogether: false
+		groupAliasesTogether: false,
+		// wether or not to include objects that are not directly exported (but they are used)
+		includeInternal: true
 	},
 	// these settings determine what is included in the project structure
 	project: {
@@ -87,8 +89,8 @@ const DEFAULT_SETTINGS = {
 		baseEndingPath: "endnotes",
 		// base path for classes
 		baseClassPath: "classes",
-		// base path for functions
-		baseFunctionPath: "functions",
+		// base path for functions and variables
+		baseUnitsPath: "units",
 		// base path for other exported values
 		baseExportedPath: "exported"
 	}

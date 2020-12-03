@@ -468,9 +468,9 @@ class Generator {
 
 		let name = "class " + classBlock.getIdentifierName();
 
-		if (meta.exported)
+		if (meta.exported === true)
 			name += " (exported class)";
-		else
+		if (meta.exported === false)
 			name += " (internal only)";
 
 		text.push({ style: "h" + headerDepth, text: name });
@@ -778,11 +778,13 @@ class Generator {
 		return ret;
 	}
 
-	generateCodeDocumentation (codeUnit, settings, headerDepth) {
+	generateCodeDocumentation (codeUnit, settings, headerDepth, options) {
 		let ret = [];
 
 		if (headerDepth === undefined)
 			headerDepth = 1;
+		if (options === undefined)
+			options = { includeInternal: true };
 
 		ret = ret.concat(this.generateFileHeader(codeUnit, settings, headerDepth));
 
@@ -804,13 +806,16 @@ class Generator {
 				meta.exported = exportedObjects.indexOf(blocks[i].getIdentifierName()) !== -1;
 			switch (blocks[i].getType()) {
 				case "classDeclaration":
+					if (options.objectsOnly)
+						break;
 					let classDocumentation =
 						this.generateClassDocumentation(blocks[i], comment, settings, headerDepth + 1, meta);
 					if (meta.exported) {
 						classes.exported.push(classDocumentation);
 					}
 					else {
-						classes.internal.push(classDocumentation);
+						if (options.includeInternal)
+							classes.internal.push(classDocumentation);
 					}
 					break;
 				case "funDeclaration":
@@ -820,7 +825,8 @@ class Generator {
 						functions.exported.push(functionDocumentation);
 					}
 					else {
-						functions.internal.push(functionDocumentation);
+						if (options.includeInternal)
+							functions.internal.push(functionDocumentation);
 					}
 					break;
 				case "varDeclaration":
@@ -830,7 +836,8 @@ class Generator {
 						variables.exported.push(varDocumentation);
 					}
 					else {
-						variables.internal.push(varDocumentation);
+						if (options.includeInternal)
+							variables.internal.push(varDocumentation);
 					}
 					break;
 			}
@@ -962,6 +969,148 @@ class Generator {
 	generateTextDocumentation (textUnit, settings) {
 	}
 
+	generateAuxiliaryFiles (files, settings) {
+		let ret = files;
+
+		if (settings.structure.generateIndex) {
+			let index = this.generateIndex(ret, settings);
+			ret.push({ path: "index.rst", content: index });
+		}
+
+		if (settings.structure.generateConfPy) {
+			let confpy = this.generateConfPy(settings);
+			ret.push({ path: "conf.py", content: confpy });
+		}
+
+		if (settings.structure.generateMakefile) {
+			let content = this.generateFileFromTemplate(this.makefileTemplate, settings);
+			ret.push({ path: "Makefile", content: content });
+		}
+
+		if (settings.structure.generateMakeBat) {
+			let content = this.generateFileFromTemplate(this.makeBatTemplate, settings);
+			ret.push({ path: "make.bat", content: content });
+		}
+
+		return ret;
+	}
+
+
+	/*
+	 * Based on settings object, generate object documentation content and return it as an array of objects
+	 * - `settings`: settings object
+	 * - `headerDepth`: number, starting header depth (defaults to 1)
+	 * Returned array elements:
+	 * - `path`: relative path to the file
+	 * - `content`: file content as rows
+	 */
+	generateObjectsContent (settings, headerDepth) {
+		if (settings === undefined)
+			settings = {};
+		util.applyDefaults(settings, this.settings);
+
+		if (headerDepth === undefined)
+			headerDepth = 1;
+
+		let ret = [];
+		let roots = this.codeTree.findRoots();
+		let units = roots.slice(0);
+		for (let i=0; i<roots.length; i++) {
+			let upstream = roots[i].getAllPrev();
+			units = util.concatUnique(units, upstream);
+		}
+
+		// first group everything in classes and other modules
+		let exportedClasses = [];
+		let internalClasses = [];
+		let modules = [];
+
+		for (let i=0; i<units.length; i++) {
+			let exported = units[i].getExportedObjects();
+			let unitClasses = units[i].getBlocksByInstance(ClassBlock);
+			let unitFunctions = units[i].getBlocksByInstance(FunctionBlock);
+			let unitVariables = units[i].getBlocksByInstance(VariableBlock);
+
+			for (let j=0; j<unitClasses.length; j++) {
+				if (exported.indexOf(unitClasses[j].getIdentifierName()) === -1)
+					internalClasses.push(unitClasses[j]);
+				else
+					exportedClasses.push(unitClasses[j]);
+			}
+
+			if ((unitFunctions.length === 0) && (unitVariables.length === 0))
+				continue;
+
+			let unitEntry = {
+				unit: units[i],
+				exportedFunctions: [],
+				exportedVariables: [],
+				internalFunctions: [],
+				internalVariables: []
+			};
+
+			for (let j=0; j<unitFunctions.length; j++) {
+				if (exported.indexOf(unitFunctions[j].getIdentifierName()) === -1) {
+					if (settings.structure.includeInternal === true)
+						unitEntry.internalFunctions.push(unitFunctions[j]);
+				}
+				else
+					unitEntry.exportedFunctions.push(unitFunctions[j]);
+			}
+
+			for (let j=0; j<unitVariables.length; j++) {
+				if (exported.indexOf(unitVariables[j].getIdentifierName()) === -1) {
+					if (settings.structure.includeInternal === true)
+						unitEntry.internalVariables.push(unitVariables[j]);
+				}
+				else
+					unitEntry.exportedVariables.push(unitVariables[j]);
+			}
+
+			if (unitEntry.exportedFunctions.length || unitEntry.exportedVariables.length ||
+				unitEntry.internalFunctions.length || unitEntry.internalVariables.length)
+				modules.push(unitEntry);
+		}
+
+		// class documentation
+		let meta = {};
+		for (let i=0; i<exportedClasses.length; i++) {
+			let comment = exportedClasses[i].getPrev(1, CommentBlock);
+			let content = this.generateClassDocumentation(exportedClasses[i], comment, settings, headerDepth+1, meta);
+			ret.push({
+				path: util.joinPaths(settings.paths.baseClassPath, exportedClasses[i].getIdentifierName() + ".rst"),
+				content: this.textToOutputRows(content, settings)
+			});
+		}
+
+		if (settings.structure.includeInternal !== true) {
+			meta = { exported: false };
+			for (let i=0; i<internalClasses.length; i++) {
+				let comment = internalClasses[i].getPrev(1, CommentBlock);
+				let content = this.generateClassDocumentation(internalClasses[i], comment, settings, headerDepth + 1, meta);
+				ret.push({
+					path: util.joinPaths(settings.paths.baseClassPath, internalClasses[i].getIdentifierName() + ".rst"),
+				content: this.textToOutputRows(content, settings)
+				});
+			}
+		}
+
+		let options = {
+			objectsOnly: true,
+			includeInternal: settings.structure.includeInternal
+		};
+		for (let i=0; i<modules.length; i++) {
+			ret.push({
+				path: util.joinPaths(settings.paths.baseUnitsPath, modules[i].unit.getExportedName() + ".rst"),
+				content: this.generateCodeDocumentation(modules[i].unit, settings, headerDepth + 1, options)
+			});
+		}
+
+		this.generateAuxiliaryFiles(ret, settings);
+
+		return ret;
+	}
+
 	/*
 	 * Based on settings object, generate text content and return it as an array of objects
 	 * - `settings`: settings object
@@ -993,25 +1142,7 @@ class Generator {
 			});
 		}
 
-		if (settings.structure.generateIndex) {
-			let index = this.generateIndex(ret, settings);
-			ret.push({ path: "index.rst", content: index });
-		}
-
-		if (settings.structure.generateConfPy) {
-			let confpy = this.generateConfPy(settings);
-			ret.push({ path: "conf.py", content: confpy });
-		}
-
-		if (settings.structure.generateMakefile) {
-			let content = this.generateFileFromTemplate(this.makefileTemplate, settings);
-			ret.push({ path: "Makefile", content: content });
-		}
-
-		if (settings.structure.generateMakeBat) {
-			let content = this.generateFileFromTemplate(this.makeBatTemplate, settings);
-			ret.push({ path: "make.bat", content: content });
-		}
+		this.generateAuxiliaryFiles(ret, settings);
 
 		return ret;
 	}

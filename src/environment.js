@@ -171,6 +171,16 @@ class Environment {
 	}
 
 	/*
+	 * Generate objects documentation
+	 * `settings`: settings object, this will be passed to the generator to replace any defaults
+	 * Returns: array of objects containing paths and content for file export
+	 */
+	generateObjectsDocumentation (settings) {
+		this.directiveEngine.runDirectives();
+		return this.generator.generateObjectsContent(settings);
+	}
+
+	/*
 	 * Generate files documentation
 	 * `settings`: settings object, this will be passed to the generator to replace any defaults
 	 * Returns: array of objects containing paths and content for file export
@@ -180,13 +190,18 @@ class Environment {
 		return this.generator.generateFileContent(settings);
 	}
 
+
 	/*
-	 * Output files documentation to given path
+	 * Output content to given path
+	 * `path`: string, path to write to (directories will be created if missing)
+	 * `content`: array of objects, content to output:
+	 *    `path`: string, relative path to the file
+	 *    `content`: array of strings, file content as rows
+	 * `settings`: settings object, this wll be passed to the generator to replace any defaults
 	 */
-	outputFilesDocumentation (path, settings) {
+	outputContent (path, content, settings) {
 		if (!path)
 			path = util.joinPaths(this.basePath, this.settings.paths.outputPath);
-		let content = this.generateFilesDocumentation(settings);
 
 		for (let i=0; i<content.length; i++) {
 			let p = util.joinPaths(path, content[i].path);
@@ -196,6 +211,26 @@ class Environment {
 			}
 			fs.writeFileSync(p, content[i].content.join("\n"));
 		}
+	}
+
+	/*
+	 * Output objects documentation to given path
+	 * `path`: string, path to write to (directories will be created if missing)
+	 * `settings`: settings object, this wll be passed to the generator to replace any defaults
+	 */
+	outputObjectsDocumentation (path, settings) {
+		let content = this.generateObjectsDocumentation(settings);
+		return this.outputContent(path, content, settings);
+	}
+
+	/*
+	 * Output files documentation to given path
+	 * `path`: string, path to write to (directories will be created if missing)
+	 * `settings`: settings object, this wll be passed to the generator to replace any defaults
+	 */
+	outputFilesDocumentation (path, settings) {
+		let content = this.generateFilesDocumentation(settings);
+		return this.outputContent(path, content, settings);
 	}
 
 }

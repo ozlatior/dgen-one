@@ -47,12 +47,12 @@ const DEFAULT_SETTINGS = {
 		// read directories recursively
 		recursive: true,
 		// regex patterns, exclude these paths (relative to project base path)
-		excludePaths: [ "^./documentation" ],
+		excludePaths: [ "^./documentation", "./node_modules", "./test" ],
 		// regex patterns, include these paths
 		// (even if excluded and even if not recursively reading dirs, relative to project base path)
 		includePaths: [],
 		// regex patterns, filenames to exclude
-		excludeFiles: [],
+		excludeFiles: [ "^dgen-one-settings.js$" ],
 		// regex patterns, filenames to include (only these will be considered if any is present)
 		includeOnly: [ ".+js$" ],
 		// path to project meta (can be package.json or another file, relative to project base path)

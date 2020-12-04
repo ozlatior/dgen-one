@@ -1,0 +1,82 @@
+__application__:
+
+	DGenOne Command Line Interface
+
+	Configure and generate documentation for a project.
+	To use, call the cli script in a directory of your choice (can be project root dir):
+
+	    node /path/to/cli.js <command> <args>
+
+	Available commands:
+
+	   help [cmd]:         display a help text for the command [cmd]
+
+	   config init:        initialize a project configuration sequence in current directory
+	                       this generates a configuration file (dgen-one-settings.js)
+	                       (not implemented)
+
+	   config default:     create a default configuration file for this project in the current
+	                       directory; this generates a configuration file (dgen-one-settings.js)
+	                       you can edit the file by hand or using `config set`
+
+	   config get <k>:     read and display a configuration value from the current config file
+	                       don't specify a key to display all configuration values
+	                       keys can be specified with `.` dot notation (project.path...)
+
+	   config set <k> <v>: set a configuration value <k> to value <v> (not implemented)
+	                       keys can be specified with `.` dot notation (project.path...)
+
+	   document files:     generate file-based documentation; this will be centered around the
+	                       files in the project and the classes and objects declared and defined
+	                       in the files
+	                       the output path used is the one specified in the settings file
+
+	   document objects:   generate object-based documentation; this will be centered around
+	                       classes and objects instead of files
+	                       the output path used is the one specified in the settings file
+
+__unknown__:
+
+	Unknown command. Available commands:
+	  help   config   document
+
+config:
+
+	Create, read and write the configuration file for this documentation.
+
+	The configuration file will normally be generated in the current working dir.
+	You have to create a configuration file first with `config init` or `config default`.
+	You can edit the created file by hand or using the `config get` and `config set` commands.
+	   
+	Available commands:
+
+	   config init:        initialize a project configuration sequence in current directory
+	                       this generates a configuration file (dgen-one-settings.js)
+	                       (not implemented)
+
+	   config default:     create a default configuration file for this project in the current
+	                       directory; this generates a configuration file (dgen-one-settings.js)
+	                       you can edit the file by hand or using `config set`
+
+	   config get <k>:     read and display a configuration value from the current config file
+	                       don't specify a key to display all configuration values
+	                       keys can be specified with `.` dot notation (project.path...)
+
+	   config set <k> <v>: set a configuration value <k> to value <v> (not implemented)
+	                       keys can be specified with `.` dot notation (project.path...)
+
+document:
+
+	Create a documentation for this project. The documentation will be saved in the directory
+	specified in the configuration file.
+
+	Available commands:
+
+	   document files:     generate file-based documentation; this will be centered around the
+	                       files in the project and the classes and objects declared and defined
+	                       in the files
+	                       the output path used is the one specified in the settings file
+
+	   document objects:   generate object-based documentation; this will be centered around
+	                       classes and objects instead of files
+	                       the output path used is the one specified in the settings file

@@ -314,9 +314,15 @@ const _export = function (codeUnit, commentBlock, codeBlock, args) {
 };
 
 /*
- * parse is handled directly by the engine
+ * does nothing, parse is handled directly by the engine
  */
 const _parse = function () {
+};
+
+/*
+ * does nothing, stop is handled directly by the engine
+ */
+const _stop = function () {
 };
 
 /*
@@ -340,3 +346,4 @@ module.exports.assign = _assign;
 module.exports.export = _export;
 module.exports.parse = _parse;
 module.exports.pattern = _pattern;
+module.exports.stop = _stop;

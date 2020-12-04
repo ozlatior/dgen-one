@@ -73,6 +73,7 @@ class DirectiveEngine {
 			if ((current instanceof CommentBlock) && current.hasDirectives()) {
 				let directives = current.getDirectives();
 				let parse = false;
+				let stop = false;
 				let block = current.getNext(0);
 				while (block instanceof CommentBlock)
 					block = block.getNext(0);
@@ -80,6 +81,8 @@ class DirectiveEngine {
 				directives.map((dir) => {
 					if (dir.verb === "parse")
 						parse = true;
+					if (dir.verb === "stop")
+						stop = true;
 					if (directive[dir.verb] instanceof Function)
 						return directive[dir.verb](codeUnit, current, block, dir.args)
 					directive._logError("Unknown directive " + dir.verb, codeUnit, current);
@@ -93,6 +96,11 @@ class DirectiveEngine {
 							"Bad target (row " + block.getStartingRow() + ") for parse directive",
 							codeUnit, current
 						);
+				}
+
+				if (stop) {
+					let index = contentBlock.getBlockIndex(current) + 1;
+					contentBlock.sliceContent(0, index);
 				}
 			}
 			current = current.getNext(0);

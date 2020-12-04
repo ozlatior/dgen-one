@@ -425,10 +425,15 @@ CodeBlock.getUnknownBlockMeta = function(content) {
 		type: "unknown"
 	};
 	ret.length = content.indexOf("\n");
+	if (ret.length === -1)
+		ret.length = content.length;
 	return ret;
 };
 
 CodeBlock.getBlockMeta = function(content) {
+	// quick-fix for minified files
+	if (content.indexOf("\n") === -1 || content.indexOf("\n") > 1000)
+		return CodeBlock.getUnknownBlockMeta(content);
 	if (content.match(PATTERNS.COMMENT_LINE) !== null)
 		return CodeBlock.getCommentLineMeta(content);
 	if (content.match(PATTERNS.COMMENT_BLOCK) !== null)
@@ -580,9 +585,16 @@ class CommentBlock extends CodeBlock {
 		let current = null;
 		let queue = [];
 
+		let getSectionFormatting = function (section) {
+			if (section.text.length && section.text[0].match(/^[ \t]*::/) !== null)
+				return "block";
+			return "paragraph";
+		};
+
 		let newSection = function (currentRow, empty, text) {
 			return {
 				text: text !== undefined ? [ text ] : [],
+				format: null,
 				bullet: null,
 				bulletText: [],
 				indent: null,
@@ -595,7 +607,11 @@ class CommentBlock extends CodeBlock {
 
 		let closeSection = function (section, currentRow) {
 			section.indent = util.getIndent(section.text);
-			section.text = util.trim(section.text).join(" ");
+			section.format = getSectionFormatting(section);
+			if (section.format === "block")
+				section.text = util.trim(section.text).map((el) => util.trim(el.replace("::", "")));
+			else
+				section.text = util.trim(section.text).join(" ");
 			section.rowCount = currentRow - section.startingRow;
 		};
 
@@ -1289,6 +1305,20 @@ class ContentBlock extends CodeBlock {
 
 	getBlocks () {
 		return this.blocks.slice(0);
+	}
+
+	getBlockIndex (block) {
+		return this.blocks.indexOf(block);
+	}
+
+	sliceContent (start, end) {
+		this.blocks = this.blocks.slice(start, end);
+		this.blocks[0].setPrev(0, null);
+		this.blocks[0].setPrev(1, null);
+		this.blocks[0].setPrev(2, null);
+		this.blocks[this.blocks.length-1].setNext(0, null);
+		this.blocks[this.blocks.length-1].setNext(1, null);
+		this.blocks[this.blocks.length-1].setNext(2, null);
 	}
 
 	getFirstBlock () {

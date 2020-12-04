@@ -226,6 +226,10 @@ class Generator {
 
 		// before
 		switch (section.style) {
+			case "bk":
+				ret.push("::");
+				ret.push("");
+				break;
 			case "h1":
 				if (this.settings.output.sectionUnderlines[0].length > 1)
 					ret.push(util.strFill(section.text.length, this.settings.output.sectionUnderlines[0][0]));
@@ -250,6 +254,9 @@ class Generator {
 
 		// text
 		switch (section.style) {
+			case "bk":
+				ret = ret.concat(util.indentBlock(section.text, "  "));
+				break;
 			case "c":
 				ret = ret.concat(util.padBlock(
 					util.wrapText(section.text, max - 3, min), { firstRow: ".. ", otherRows: "", width: 3 }
@@ -353,6 +360,17 @@ class Generator {
 	}
 
 	/*
+	 * Get style for each block formatting
+	 */
+	formatToStyle (format) {
+		switch (format) {
+			case "block":
+				return "bk";
+		}
+		return "p";
+	}
+
+	/*
 	 * Convert comment sections to text
 	 * `sections`: array of sections, block sections to convert to text
 	 * `settings`: settings object, settings to apply for this conversion
@@ -365,7 +383,7 @@ class Generator {
 		let queue = [];
 		let current = null;
 		for (let i=0; i<sections.length; i++) {
-			text.push({ style: "p", text: sections[i].text });
+			text.push({ style: this.formatToStyle(sections[i].format), text: sections[i].text });
 			if (sections[i].bulletText && sections[i].bulletText.length > 0) {
 				queue = [];
 				current = sections[i].bulletText;
@@ -1038,7 +1056,7 @@ class Generator {
 					exportedClasses.push(unitClasses[j]);
 			}
 
-			if ((unitFunctions.length === 0) && (unitVariables.length === 0))
+			if ((unitClasses.length > 0) && (unitFunctions.length === 0) && (unitVariables.length === 0))
 				continue;
 
 			let unitEntry = {
@@ -1067,9 +1085,7 @@ class Generator {
 					unitEntry.exportedVariables.push(unitVariables[j]);
 			}
 
-			if (unitEntry.exportedFunctions.length || unitEntry.exportedVariables.length ||
-				unitEntry.internalFunctions.length || unitEntry.internalVariables.length)
-				modules.push(unitEntry);
+			modules.push(unitEntry);
 		}
 
 		// class documentation

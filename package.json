@@ -1,6 +1,6 @@
 {
   "name": "dgen-one",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "RST Documentation Generator for nodejs",
   "main": "index.js",
   "scripts": {
@@ -26,5 +26,8 @@
   "bugs": {
     "url": "https://github.com/ozlatior/dgen-one/issues"
   },
-  "homepage": "https://github.com/ozlatior/dgen-one#readme"
+  "homepage": "https://github.com/ozlatior/dgen-one#readme",
+  "directories": {
+    "test": "test"
+  }
 }

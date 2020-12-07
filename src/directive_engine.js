@@ -1,6 +1,6 @@
 /*
  * Directive Engine Class
- * 
+ *
  * The Directive Engine Class applies directives to CodeUnits and/or CodeBlocks.
  * Directives can be either specified in comments or applied programatically.
  *

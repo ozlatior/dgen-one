@@ -3,12 +3,35 @@
  *
  * A code block is a functional piece of code, eg a comment block, a function or a
  * class declaration
+ */
+
+const util = require("./util.js");
+
+/*
+ * Regex patterns used to read the code
+ */
+const PATTERNS = {
+	COMMENT_LINE: /^[ \t\n]*\/{2}.*\n/,
+	COMMENT_BLOCK: /^[ \t\n]*\/\*.*\n/,
+	REQUIRE_MODULE: /^[ \t\n]*(var|const)[ \t\n]+[a-zA-Z1-9_]+[ \t\n]*=[ \t\n]*require\(['"].+['"]\);?/,
+	FUN_DECLARATION: /^[ \t\n]*(((let|var|const)[ \t\n]+[a-zA-Z0-9_]+[ \t\n]*=[ \t\n]*function)|(function[ \t\n]+[a-zA-Z0-9]+))[ \t\n]*\([^()]*\)[ \t\n]*{/,
+	VAR_DECLARATION: /^[ \t\n]*(const|var|let)[ \t\n]+[a-zA-Z0-9_]+[ \t\n]*=[ \t\n]*.*/,
+	CLASS_DECLARATION: /^[ \t\n]*class[ \t\n]+[a-zA-Z0-9_]+[ \t\n]*( extends[ \t\n]+[a-zA-Z0-9_]+[ \t\n]*)?{/,
+	ASSIGNMENT: /^[ \t\n]*[a-zA-Z0-9_.]+[ \t\n]*=[ \t\n]*.*;/,
+	METHOD_DECLARATION: /^[ \t\n]*[a-zA-Z0-9_]+[ \t\n]*\([^()]*\)[ \t\n]*{/
+};
+
+/*
+ * CodeBlock class
+ *
+ * A code block is a functional piece of code, eg a comment block, a function or a
+ * class declaration
  *
  * Blocks are linked like a list, but on three different levels:
  * - level 0: any block before or after, regardless of proximity
  * - level 1: any immediately adjacent block, regardless of type
  * - level 2: any block before or after, up to the first comment block that is not level1-linked
- * 
+ *
  * For example:
  *
  * 1: <comment block> (section header 1)
@@ -56,25 +79,18 @@
  * Use the optional `of` argument to select only blocks of specific type
  *     block.getList(level, of);
  */
-
-const util = require("./util.js");
-
-const PATTERNS = {
-	COMMENT_LINE: /^[ \t\n]*\/{2}.*\n/,
-	COMMENT_BLOCK: /^[ \t\n]*\/\*.*\n/,
-	REQUIRE_MODULE: /^[ \t\n]*(var|const)[ \t\n]+[a-zA-Z1-9_]+[ \t\n]*=[ \t\n]*require\(['"].+['"]\);?/,
-	FUN_DECLARATION: /^[ \t\n]*(((let|var|const)[ \t\n]+[a-zA-Z0-9_]+[ \t\n]*=[ \t\n]*function)|(function[ \t\n]+[a-zA-Z0-9]+))[ \t\n]*\([^()]*\)[ \t\n]*{/,
-	VAR_DECLARATION: /^[ \t\n]*(const|var|let)[ \t\n]+[a-zA-Z0-9_]+[ \t\n]*=[ \t\n]*.*/,
-	CLASS_DECLARATION: /^[ \t\n]*class[ \t\n]+[a-zA-Z0-9_]+[ \t\n]*( extends[ \t\n]+[a-zA-Z0-9_]+[ \t\n]*)?{/,
-	ASSIGNMENT: /^[ \t\n]*[a-zA-Z0-9_.]+[ \t\n]*=[ \t\n]*.*;/,
-	METHOD_DECLARATION: /^[ \t\n]*[a-zA-Z0-9_]+[ \t\n]*\([^()]*\)[ \t\n]*{/
-};
-
 class CodeBlock {
 
 	/*
-	 * The content can have multiple code blocks, in which case only the
-	 * first block will be assimilated as content
+	 * Create new content block based on string content
+	 * `content`: either of the following
+	 * - string, the content to read into this content block
+	 * - CodeBlock object, use this as a copy constructor
+	 * `row`: number, optional, starting row for the content (not used in copy-constructor mode)
+	 *     default value is 0
+	 *
+	 * If more than one block is present in the content, only the first block
+	 * will be processed into this CodeBlock object
 	 */
 	constructor (content, row) {
 		if (content instanceof CodeBlock) {
@@ -110,62 +126,136 @@ class CodeBlock {
 		];
 	}
 
+	/*
+	 * Get class (constructor) name for this object
+	 *
+	 * Returns string, the class name, eg `CodeBlock` or `CommentBlock`
+	 */
 	getClassName () {
 		return this.constructor.name;
 	}
 
+	/*
+	 * Get the string type for this CodeBlock instance.
+	 *
+	 * Returns string, one of `commentLine`, `commentBlock`, `requireModule`, `funDeclaration`,
+	 * `varDeclaration`, `classDeclaration`, `methodDeclaration`, `assignment` or `unknown`
+	 */
 	getType () {
 		return this.type;
 	}
 
+	/*
+	 * Get the starting row for this CodeBlock
+	 *
+	 * Returns number, the starting row passed as argument to the constructor
+	 */
 	getStartingRow () {
 		return this.startingRow;
 	}
 
+	/*
+	 * Get the total row count for this CodeBlock
+	 *
+	 * Returns number, the total number of rows for this codeblock
+	 */
 	getRowCount () {
 		return this.rowCount;
 	}
 
+	/*
+	 * Get the original content parsed by this CodeBlock
+	 *
+	 * Returns string, the content used to create this CodeBlock - only the content actually part
+	 * of the codeblock will be returned, not the entire string passed to the constructor
+	 */
 	getContent () {
 		return this.content;
 	}
 
+	/*
+	 * Get the original content length parsed by this CodeBlock
+	 *
+	 * Returns number, the length of the content used to create this CodeBlock - only the content
+	 * actually part of the codeblock will be considered, not the entire string passed to the constructor
+	 */
 	getContentLength () {
 		return this.content.length;
 	}
 
+	/*
+	 * Get the number of empty rows before this CodeBlock
+	 *
+	 * Returns number, the number of empty rows before the content of this CodeBlock
+	 */
 	getRowsBefore () {
 		return this.rowsBefore;
 	}
 
+	/*
+	 * Set the number of empty rows before this CodeBlock
+	 * `rows`: number, the number of empty rows before the content parsed by this CodeBlock
+	 */
 	setRowsBefore (rows) {
 		this.rowsBefore = rows;
 	}
 
+	/*
+	 * Get the number of empty rows after this CodeBlock
+	 *
+	 * Returns number, the number of empty rows after the content of this CodeBlock
+	 */
 	getRowsAfter () {
 		return this.rowsAfter;
 	}
 
+	/*
+	 * Set the number of empty rows after this CodeBlock
+	 * `rows`: number, the number of empty rows after the content parsed by this CodeBlock
+	 */
 	setRowsAfter (rows) {
 		this.rowsAfter = rows;
 	}
 
+	/*
+	 * Get the exported (identifier) name for this CodeBlock
+	 *
+	 * Returns string, the exported (identifier) name, for instance the class name or variable name.
+	 */
 	getExportedName () {
 		return this.exportedName;
 	}
 
+	/*
+	 * Set the exported (identifier) name for this CodeBlock
+	 * `name`: string, the exported (identifier) name, for instance the class name or variable name.
+	 */
 	setExportedName (name) {
 		this.exportedName = name;
 	}
 
+	/*
+	 * Get a copy of the aliases list for this CodeBlock
+	 *
+	 * Returns: array of strings, copy of the aliases list
+	 */
 	getAliases () {
 		return this.aliases.slice(0);
 	}
 
+	/*
+	 * Set the aliases list to a new set of values provided in the array
+	 * `aliases`: array of strings, the new values for the aliases list
+	 */
 	setAliases (aliases) {
 		this.aliases = aliases.slice(0);
 	}
 
+	/*
+	 * Add a new alias to the aliases list
+	 * `alias`: string, new alias to add to the list
+	 * Returns: boolean, true if successful, false if not (alias already in the list)
+	 */
 	addAlias (alias) {
 		if (this.aliases.indexOf(alias) !== -1)
 			return false;
@@ -173,22 +263,48 @@ class CodeBlock {
 		return true;
 	}
 
+	/*
+	 * Remove all aliases from the aliases list
+	 */
 	clearAliases () {
 		this.aliases = [];
 	}
 
+	/*
+	 * Get the number of aliases in the list
+	 *
+	 * Returns: number, the size of the aliases list
+	 */
 	getAliasCount () {
 		return this.aliases.length;
 	}
 
+	/*
+	 * Assign a value to an object field for this CodeBlock
+	 * `field`: string, name of the field
+	 * `value`: any type, value to assign - can be any value or a CodeBlock reference
+	 *
+	 * Fields are exported in the documentation, so assigned fields are one way to specify that an
+	 * object contains a value or a reference to another object defined by a CodeBlock
+	 */
 	assignField (field, value) {
 		this.assignedFields[field] = value;
 	}
 
+	/*
+	 * Get a reference to the assigned fields of this CodeBlock
+	 *
+	 * Returns: object, reference to the internal assigned fields object.
+	 */
 	getAssignedFields () {
 		return this.assignedFields;
 	}
 
+	/*
+	 * Get a list of assigned field names for this CodeBlock
+	 *
+	 * Returns: array of strings, list of assigned fields
+	 */
 	getAssignedFieldNames () {
 		let ret = [];
 		for (let i in this.assignedFields)
@@ -526,8 +642,11 @@ class CommentBlock extends CodeBlock {
 
 	/*
 	 * For bulleted rows, extract what looks like the bullet, eg ` * ` or ` - `
-	 * Accepted bullets: *, -, +, >, ->, =>, #
-	 * Treats as bullets any row starting with [ `...`: ] (returns [ ``: ])
+	 *
+	 * Accepted bullets: \*, -, +, >, ->, =>, #
+	 *
+	 * Treats as bullets any row starting with [ `...`: ] (returns [ \``: ])
+	 *
 	 * Bullets must be followed by space
 	 *
 	 * Returns `null` if no bullet or the bullet string if a bullet was found
@@ -1426,14 +1545,14 @@ class ContentBlock extends CodeBlock {
 
 }
 
-CodeBlock.AssignmentBlock = AssignmentBlock;
-CodeBlock.ClassBlock = ClassBlock;
-CodeBlock.MethodBlock = MethodBlock;
-CodeBlock.VariableBlock = VariableBlock;
-CodeBlock.FunctionBlock = FunctionBlock;
-CodeBlock.RequireBlock = RequireBlock;
-CodeBlock.CommentBlock = CommentBlock;
-
-CodeBlock.ContentBlock = ContentBlock;
-
 module.exports = CodeBlock;
+
+module.exports.AssignmentBlock = AssignmentBlock;
+module.exports.ClassBlock = ClassBlock;
+module.exports.MethodBlock = MethodBlock;
+module.exports.VariableBlock = VariableBlock;
+module.exports.FunctionBlock = FunctionBlock;
+module.exports.RequireBlock = RequireBlock;
+module.exports.CommentBlock = CommentBlock;
+
+module.exports.ContentBlock = ContentBlock;

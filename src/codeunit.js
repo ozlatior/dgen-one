@@ -1,12 +1,5 @@
 /*
  * CodeUnit class
- *
- * A code unit is basically a file containing code
- *
- * Code units can be linked in a tree structure by adding CodeUnit references
- * to the link.prev and link.next arrays
- * Use the `linkNext()` and `linkPrev()` method for this purpose
- *
  */
 
 const CodeBlock = require("./codeblock.js");
@@ -19,6 +12,15 @@ const ClassBlock = CodeBlock.ClassBlock;
 const AssignmentBlock = CodeBlock.AssignmentBlock;
 const ContentBlock = CodeBlock.ContentBlock;
 
+/*
+ * CodeUnit class
+ *
+ * A code unit is basically a file containing code
+ *
+ * Code units can be linked in a tree structure by adding CodeUnit references
+ * to the link.prev and link.next arrays
+ * Use the `linkNext()` and `linkPrev()` method for this purpose
+ */
 class CodeUnit {
 
 	constructor (content, row, path, name, description) {
@@ -132,8 +134,7 @@ class CodeUnit {
 			target = target.replace("module.exports", "");
 			if (target === "")
 				this.exportedMain = blocks[i].getValue();
-			else
-				this.exportedObjects.push(blocks[i].getValue());
+			this.exportedObjects.push(blocks[i].getValue());
 		}
 	}
 

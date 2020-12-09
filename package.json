@@ -1,6 +1,6 @@
 {
   "name": "dgen-one",
-  "version": "0.0.2",
+  "version": "0.0.2-b",
   "description": "RST Documentation Generator for nodejs",
   "main": "index.js",
   "scripts": {
